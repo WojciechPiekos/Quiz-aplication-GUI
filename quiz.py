@@ -29,7 +29,11 @@ class Worker(QRunnable):
         except Exception as e:
             self.signals.error.emit(str(e))
         else:
-            self.signals.result.emit(data)
+            if data['results']:
+                data_dict = {}
+                for n,item in enumerate(data['results']):
+                    data_dict[f'question{n}'] = (item["category"],item["question"],item["correct_answer"])
+                self.signals.result.emit(data_dict)
         finally:
             self.signals.finished.emit("done")
 
@@ -50,6 +54,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.actionHard.triggered.connect(self.difficult_hard)
 
         self.threadpool = QThreadPool()
+        self.new_game()
 
 
     def difficult_medium(self):
@@ -64,13 +69,14 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.parameters['difficulty'] = 'medium'
 
     def print_data(self,data):
-        print(data)
+        self.questionText.setPlainText(data['question0'][1].replace("&quot;",'"'))
 
 
     def new_game(self):
         worker = Worker(self.parameters)
         worker.signals.result.connect(self.print_data)
         self.threadpool.start(worker)
+        self.
 
 
 
