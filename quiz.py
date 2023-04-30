@@ -1,5 +1,6 @@
 import sys
 import requests
+import random
 from PyQt6 import QtWidgets, uic
 from PyQt6.QtCore import QRunnable,QObject,QThreadPool,pyqtSignal,pyqtSlot
 
@@ -12,28 +13,24 @@ class WorkerSignals(QObject):
     error = pyqtSignal(str)
 
 class Worker(QRunnable):
-    def __init__(self,params):
+    def __init__(self,url,params=None):
         super().__init__()
+        self.url = url
         self.parameters = params
         self.signals = WorkerSignals()
 
     @pyqtSlot()
     def run(self):
         # Pobranie pytania
-        print(self.parameters)
-        api_url = "https://opentdb.com/api.php"
+
         try:
-            response = requests.get(api_url,params=self.parameters)
+            response = requests.get(url=self.url,params=self.parameters)
             data = response.json()
 
         except Exception as e:
             self.signals.error.emit(str(e))
         else:
-            if data['results']:
-                data_dict = {}
-                for n,item in enumerate(data['results']):
-                    data_dict[f'question{n}'] = (item["category"],item["question"],item["correct_answer"])
-                self.signals.result.emit(data_dict)
+            self.signals.result.emit(data)
         finally:
             self.signals.finished.emit("done")
 
@@ -44,39 +41,72 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.actionExit.triggered.connect(QtWidgets.QApplication.quit)
         self.actionStart_New_Game.triggered.connect(self.new_game)
         self.parameters = {
-            'amount' : '10',
+            'amount' : '1',
             'category' : '18',
             'difficulty' : 'easy',
             'type' : 'boolean'
         }
-        self.actionMedium.triggered.connect(self.difficult_medium)
-        self.actionEasy.triggered.connect(self.difficult_easy)
-        self.actionHard.triggered.connect(self.difficult_hard)
+        self.categories = {}
+        self.data_dict = {}
+        self.name = ''
+
+        self.actionMedium.triggered.connect(lambda: self.difficult_level('medium'))
+        self.actionEasy.triggered.connect(lambda: self.difficult_level('easy'))
+        self.actionHard.triggered.connect(lambda: self.difficult_level('medium'))
 
         self.threadpool = QThreadPool()
-        self.new_game()
-
-
-    def difficult_medium(self):
-        self.parameters['difficulty'] = 'medium'
-
-    
-    def difficult_easy(self):
-        self.parameters['difficulty'] = 'easy'
+        self.category_request()
         
+
+
+    def difficult_level(self,level):
+        if level == 'medium':
+            self.parameters['difficulty'] = 'medium'
+        if level == 'easy':
+            self.parameters['difficulty'] = 'easy'
+        
+
+    def request_question(self):
+        api_url = "https://opentdb.com/api.php"
+
+        worker = Worker(api_url,self.parameters)
+        worker.signals.result.connect(self.prepare_data)
+        worker.signals.finished.connect(self.finished)
+        self.threadpool.start(worker)
+
     
-    def difficult_hard(self):
-        self.parameters['difficulty'] = 'medium'
+    def category_request(self):
+        url = 'https://opentdb.com/api_category.php'
 
-    def print_data(self,data):
-        self.questionText.setPlainText(data['question0'][1].replace("&quot;",'"'))
+        worker = Worker(url)
+        worker.signals.result.connect(self.set_category)
+        self.threadpool.start(worker)
 
+
+    def set_category(self,data):
+        self.categories = data
+
+
+    def prepare_data(self,data):
+        if data['results']:
+            self.data_dict['question'] = (data['results'][0]['category'],
+                                          data['results'][0]['question'].replace('&quot;','"'),
+                                          data['results'][0]['correct_answer'])
+               
+
+    def finished(self,str):
+        self.questionText.setPlainText(f"Category: {self.name}\n\n{self.data_dict['question'][1]}")
 
     def new_game(self):
-        worker = Worker(self.parameters)
-        worker.signals.result.connect(self.print_data)
-        self.threadpool.start(worker)
-        self.
+        # Losowanie kategorii
+        categorie = random.choice(self.categories["trivia_categories"])
+        self.parameters['category'] = categorie['id']
+        self.name = categorie['name']
+
+        self.request_question()
+        
+
+        
 
 
 
