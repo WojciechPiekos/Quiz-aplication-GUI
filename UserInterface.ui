@@ -224,9 +224,17 @@ color: rgb(255, 255, 255);</string>
     </property>
     <addaction name="actionList"/>
    </widget>
+   <widget class="QMenu" name="menuHelp">
+    <property name="title">
+     <string>Help</string>
+    </property>
+    <addaction name="actionAbout"/>
+    <addaction name="actionHelp"/>
+   </widget>
    <addaction name="menuGame"/>
    <addaction name="menuDifficulty_Level"/>
    <addaction name="menuBest_Scores"/>
+   <addaction name="menuHelp"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="actionStart_New_Game">
@@ -257,6 +265,16 @@ color: rgb(255, 255, 255);</string>
   <action name="actionList">
    <property name="text">
     <string>List</string>
+   </property>
+  </action>
+  <action name="actionAbout">
+   <property name="text">
+    <string>About</string>
+   </property>
+  </action>
+  <action name="actionHelp">
+   <property name="text">
+    <string>Help</string>
    </property>
   </action>
  </widget>

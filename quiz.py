@@ -32,8 +32,8 @@ class Worker(QRunnable):
             self.signals.error.emit(str(e))
         else:
             self.signals.result.emit(data)
-        finally:
             self.signals.finished.emit("done")
+
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self, *args, obj=None, **kwargs):
@@ -52,15 +52,18 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.data_dict = {}
         self.name = ''
         self.score = 0
+        self.heart = 3
+        self.error_flag = False
 
         self.timer = QTimer(self)
         
-
         self.actionMedium.triggered.connect(lambda: self.difficult_level('medium'))
         self.actionEasy.triggered.connect(lambda: self.difficult_level('easy'))
         self.actionHard.triggered.connect(lambda: self.difficult_level('medium'))
         self.buttonOK.clicked.connect(lambda: self.game_logic("True"))
         self.buttonNO.clicked.connect(lambda: self.game_logic("False"))
+
+        self.labelDifficultLevel.setText(f"Level: {self.parameters['difficulty'].capitalize()}")
 
         self.threadpool = QThreadPool()
         self.category_request()
@@ -68,11 +71,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
 
     def difficult_level(self,level):
-        
+
         if level == 'medium':
             self.parameters['difficulty'] = 'medium'
+            self.labelDifficultLevel.setText(f"Level: {self.parameters['difficulty'].capitalize()}")
         if level == 'easy':
             self.parameters['difficulty'] = 'easy'
+            self.labelDifficultLevel.setText(f"Level: {self.parameters['difficulty'].capitalize()}")
         
 
     def request_question(self):
@@ -82,15 +87,27 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         worker = Worker(api_url,self.parameters)
         worker.signals.result.connect(self.prepare_data)
         worker.signals.finished.connect(self.finished)
+        worker.signals.error.connect(self.errors_function)
         self.threadpool.start(worker)
 
     
+    def errors_function(self,err):
+        self.error_flag = True
+        error = QtWidgets.QMessageBox(self)
+        error.setWindowTitle("Oops.. Something Went Wrong")
+        error.setText(err)
+        error.setIcon(QtWidgets.QMessageBox.Icon.Critical)
+        error.setStyleSheet("background: #333333; color: white")
+        error.exec()
+        
+
     def category_request(self):
 
         url = 'https://opentdb.com/api_category.php'
 
         worker = Worker(url)
         worker.signals.result.connect(self.set_category)
+        worker.signals.error.connect(self.errors_function)
         self.threadpool.start(worker)
 
 
@@ -104,8 +121,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.data_dict['question'] = (data['results'][0]['category'],
                                           html.unescape(data['results'][0]['question']),
                                           data['results'][0]['correct_answer'])
-            
-            print(data['results'][0]['correct_answer'])
                
 
     def finished(self,str):
@@ -118,25 +133,58 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def random_categorie(self):
 
         # Losowanie kategorii
-        self.labelDifficultLevel.setText(f"Level: {self.parameters['difficulty'].capitalize()}")
         categorie = random.choice(self.categories["trivia_categories"])
         self.parameters['category'] = categorie['id']
         self.name = categorie['name']
 
         self.request_question()
 
+
     def new_game(self):
 
-        if self.categories:
-            self.start_game()
+        if self.error_flag:
+           self.category_request()
+           self.error_flag = False
+        else: 
+            if self.categories:
+                self.start_game()
+                self.buttonOK.setDisabled(False)
+                self.buttonNO.setDisabled(False)
         
 
     def start_game(self):
 
         self.random_categorie()
         self.score = 0
+        self.heart = 3
+        self.actionHard.setDisabled(True)
+        self.actionMedium.setDisabled(True)
+        self.actionEasy.setDisabled(True)
+        self.heart1.setVisible(True)
+        self.heart2.setVisible(True)
+        self.heart3.setVisible(True)
         self.game_logic()
 
+
+    def heart_update(self):
+        
+        if self.heart == 3:
+            self.heart -= 1
+            self.heart3.setVisible(False)
+            parameter = "Continue"
+        elif self.heart == 2:
+            self.heart -= 1
+            self.heart2.setVisible(False)
+            parameter = "Continue"
+        elif self.heart == 1:
+            self.heart -= 1
+            self.heart1.setVisible(False)
+            parameter = "End of game"
+        else:
+            parameter = "End of game"
+        
+        return parameter
+        
 
     def game_logic(self,data=None):
 
@@ -152,20 +200,17 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 self.questionText.setPlainText("\n\n\n\n                Good Answer")
             else:
                 self.questionText.setStyleSheet("background-color: red;")
-                self.timer.singleShot(500,self.random_categorie)
-                self.questionText.setPlainText("\n\n\n\n                Bad Answer")
-
-
-
-
-
-
-
-
-
-
-
-
+                chances = self.heart_update()
+                if chances == "Continue":
+                    self.timer.singleShot(500,self.random_categorie)
+                    self.questionText.setPlainText("\n\n\n\n                Bad Answer")
+                elif chances == "End of game":
+                    self.questionText.setPlainText("\n\n\n\n                Game Over")
+                    self.actionHard.setDisabled(False)
+                    self.actionMedium.setDisabled(False)
+                    self.actionEasy.setDisabled(False)
+                    self.buttonOK.setDisabled(True)
+                    self.buttonNO.setDisabled(True)
 
 
 
