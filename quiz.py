@@ -3,6 +3,7 @@ import requests
 import random
 import html
 from PyQt6 import QtWidgets, uic
+from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import QRunnable,QObject,QThreadPool,pyqtSignal,pyqtSlot,QTimer
 
 from MainWindow import Ui_MainWindow
@@ -34,6 +35,31 @@ class Worker(QRunnable):
             self.signals.result.emit(data)
             self.signals.finished.emit("done")
 
+class Dialog(QtWidgets.QDialog):
+    def __init__(self,title,url,body):
+        super().__init__()
+        self.title = title
+        self.url = url
+        self.body = body
+
+        self.setWindowTitle(self.title)
+        self.resize(250,300)
+        self.setStyleSheet("background: #333333; color: white; ")
+        button = (
+        QtWidgets.QDialogButtonBox.StandardButton.Close
+        )
+        self.buttonBox = QtWidgets.QDialogButtonBox(button)
+        self.buttonBox.rejected.connect(self.reject)
+        self.layout = QtWidgets.QVBoxLayout()
+        image = QtWidgets.QLabel()
+        image.setPixmap(QPixmap(self.url))
+        message = QtWidgets.QLabel(self.body)
+        
+        self.layout.addWidget(image)
+        self.layout.addWidget(message)
+        self.layout.addWidget(self.buttonBox)
+        self.setLayout(self.layout)
+        
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self, *args, obj=None, **kwargs):
@@ -42,6 +68,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.setStyleSheet(".MainWindow {background: #333333;}")
         self.actionExit.triggered.connect(QtWidgets.QApplication.quit)
         self.actionStart_New_Game.triggered.connect(self.new_game)
+        self.actionHelp.triggered.connect(self.help_window)
+        self.actionAbout.triggered.connect(self.about_window)
+
         self.parameters = {
             'amount' : '1',
             'category' : '18',
@@ -68,6 +97,49 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.threadpool = QThreadPool()
         self.category_request()
         
+
+    def help_window(self):
+
+        title = "Help"
+        url = "images/otje2.jpg"
+        body = """
+    1. Quiz requires an active internet
+        connection.
+
+    2. To start the game, 
+        select Game - New Game.
+
+    3. Changing the difficulty 
+        level is possible only 
+        before starting the game. 
+        This can be done in the 
+        Difficulty Level menu.
+
+    4. The player starts with 
+        three lives, after each 
+        wrong answer the player 
+        loses one life.
+
+    5. The game ends when the player 
+        loses last life
+    
+        """
+
+        dialog = Dialog(title,url,body)
+        dialog.exec()
+
+    def about_window(self):
+        title = "About"
+        url = "images/otje2.jpg"
+        body = """
+    Author: WojciechP
+    
+    Date: 01.05.2023
+    
+        """
+
+        dialog = Dialog(title,url,body)
+        dialog.exec()
 
 
     def difficult_level(self,level):
