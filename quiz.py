@@ -1,65 +1,13 @@
 import sys
-import requests
 import random
 import html
 from PyQt6 import QtWidgets, uic
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import QRunnable,QObject,QThreadPool,pyqtSignal,pyqtSlot,QTimer
-
+from PyQt6.QtCore import QThreadPool,QTimer
+from database_service import BestScore
+from popups import Messages, Dialog
+from thread_handling import Worker
 from MainWindow import Ui_MainWindow
 
-class WorkerSignals(QObject):
-
-    finished = pyqtSignal(str)
-    result = pyqtSignal(dict)
-    error = pyqtSignal(str)
-
-class Worker(QRunnable):
-    def __init__(self,url,params=None):
-        super().__init__()
-        self.url = url
-        self.parameters = params
-        self.signals = WorkerSignals()
-
-    @pyqtSlot()
-    def run(self):
-        # Pobranie pytania
-
-        try:
-            response = requests.get(url=self.url,params=self.parameters)
-            data = response.json()
-
-        except Exception as e:
-            self.signals.error.emit(str(e))
-        else:
-            self.signals.result.emit(data)
-            self.signals.finished.emit("done")
-
-class Dialog(QtWidgets.QDialog):
-    def __init__(self,title,url,body):
-        super().__init__()
-        self.title = title
-        self.url = url
-        self.body = body
-
-        self.setWindowTitle(self.title)
-        self.resize(250,300)
-        self.setStyleSheet("background: #333333; color: white; ")
-        button = (
-        QtWidgets.QDialogButtonBox.StandardButton.Close
-        )
-        self.buttonBox = QtWidgets.QDialogButtonBox(button)
-        self.buttonBox.rejected.connect(self.reject)
-        self.layout = QtWidgets.QVBoxLayout()
-        image = QtWidgets.QLabel()
-        image.setPixmap(QPixmap(self.url))
-        message = QtWidgets.QLabel(self.body)
-        
-        self.layout.addWidget(image)
-        self.layout.addWidget(message)
-        self.layout.addWidget(self.buttonBox)
-        self.setLayout(self.layout)
-        
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self, *args, obj=None, **kwargs):
@@ -126,6 +74,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         """
 
         dialog = Dialog(title,url,body)
+        dialog.add_widgets_to_layout()
         dialog.exec()
 
     def about_window(self):
@@ -133,12 +82,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         url = "images/otje2.jpg"
         body = """
     Author: WojciechP
-    
+
     Date: 01.05.2023
     
         """
 
         dialog = Dialog(title,url,body)
+        dialog.add_widgets_to_layout()
         dialog.exec()
 
 
@@ -165,11 +115,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     
     def errors_function(self,err):
         self.error_flag = True
-        error = QtWidgets.QMessageBox(self)
-        error.setWindowTitle("Oops.. Something Went Wrong")
-        error.setText(err)
-        error.setIcon(QtWidgets.QMessageBox.Icon.Critical)
-        error.setStyleSheet("background: #333333; color: white")
+        error = Messages("Opss...Something goes wrong",err,QtWidgets.QMessageBox.Icon.Critical)
         error.exec()
         
 
@@ -263,7 +209,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.scoreLabel.setText(f'Score: {str(self.score)}')
         if data:
             answer = self.data_dict['question'][2]
-            print(data)
             if answer == data:
                 self.score += 1
                 self.scoreLabel.setText(f'Score: {str(self.score)}')
@@ -283,6 +228,52 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                     self.actionEasy.setDisabled(False)
                     self.buttonOK.setDisabled(True)
                     self.buttonNO.setDisabled(True)
+
+                    # Save to database
+                    if self.score > 0:
+                        save_to_db = self.end_game_messages(title="Save Your Score",
+                                                            msg=f"Congrats!!!\nYou Have {self.score} Points\nDo You Want Save Your Score?")
+                        
+                        if save_to_db:
+                            body = "                    Save Your Score "
+                            dialog = Dialog("Save To Database","images/otje2.jpg",body=body)
+                            frame = QtWidgets.QFrame()
+                            layout = QtWidgets.QFormLayout()
+                            name = QtWidgets.QLineEdit()
+                            layout.addRow("Enter Your Name:",name)
+                            frame.setLayout(layout)
+                            button = QtWidgets.QDialogButtonBox.StandardButton.Save
+                            dialog.add_widgets_to_layout(frame,button)
+                            
+                            if dialog.exec():
+                                connection = BestScore("best_scores.db")
+                                connection.add_record(name.text(),self.score)
+        
+                    # Asking about next game
+                    play_agin = self.end_game_messages(title="Play again",
+                                                       msg="Do You Want Play Again?")
+                    if play_agin:
+                        self.new_game()
+                    else:
+                        return
+                    
+
+    def end_game_messages(self,title,msg):
+
+        question = Messages(title,msg,
+                            QtWidgets.QMessageBox.Icon.Question)
+                    
+        question.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Yes\
+                                    | QtWidgets.QMessageBox.StandardButton.No)
+                    
+        button = question.exec()
+
+        if button == QtWidgets.QMessageBox.StandardButton.Yes:
+            return True
+        elif button == QtWidgets.QMessageBox.StandardButton.No:
+            return False
+
+
 
 
 
