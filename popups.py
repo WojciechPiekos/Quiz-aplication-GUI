@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QMessageBox, QVBoxLayout,
 from PyQt6.QtGui import QPixmap
 
 class Dialog(QDialog):
-    def __init__(self,title,url,body):
+    def __init__(self,title,url=None,body=None):
         super().__init__()
         self.title = title
         self.url = url
@@ -13,9 +13,11 @@ class Dialog(QDialog):
         self.setStyleSheet("background: #333333; color: white; ")
         
         self.layout = QVBoxLayout()
-        self.image = QLabel()
-        self.image.setPixmap(QPixmap(self.url))
-        self.message = QLabel(self.body)
+        if url:
+            self.image = QLabel()
+            self.image.setPixmap(QPixmap(self.url))
+        if body:
+            self.message = QLabel(self.body)
 
 
     def add_widgets_to_layout(self, widget = None, button = None):
@@ -29,9 +31,13 @@ class Dialog(QDialog):
             buttons = (QDialogButtonBox.StandardButton.Close)
             self.buttonBox = QDialogButtonBox(buttons)
             self.buttonBox.rejected.connect(self.reject)
-
-        self.layout.addWidget(self.image)
-        self.layout.addWidget(self.message)
+        
+        if self.url:
+            self.layout.addWidget(self.image)
+        
+        if self.body:
+            self.layout.addWidget(self.message)
+        
         if widget:
             self.layout.addWidget(widget)
         
